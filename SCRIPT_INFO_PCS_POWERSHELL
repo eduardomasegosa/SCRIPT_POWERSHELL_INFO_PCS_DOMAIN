@@ -1,0 +1,52 @@
+"PC001", "PC002" |
+ForEach-Object {
+$fecha = Get-Date -Format "MM/dd/yyyy HH:mm";
+$activo = "NO";
+if (Test-Connection -ComputerName $_ -Quiet) { $activo = "SI" };
+$nombrepc = hostname;
+$ip = "";
+#$ip = get-wmiobject win32_networkadapterconfiguration -computer $_ -filter "IPEnabled='True'" | select -ExpandProperty IPAddress | out-string;
+$ip = (Get-NetIPAddress | Where-Object {$_.AddressFamily -eq 'IPv4' -and $_.InterfaceAlias -notlike "*oopback*"}).IPAddress;
+$mac = get-wmiobject win32_networkadapterconfiguration -computer $_ -filter "IPEnabled='True'" | Select-Object -ExpandProperty  MACAddress;
+$cpu = Get-WmiObject Win32_Processor -computerName $_ | Select-Object -ExpandProperty  Name;
+$ramvelocidad = Get-WmiObject win32_physicalmemory -computerName $_ | Select-Object -ExpandProperty Configuredclockspeed ;
+$ramtipo = Get-WmiObject win32_physicalmemory -computerName $_ | Select-Object -ExpandProperty Devicelocator ;
+$ramtamaño = Get-WmiObject win32_physicalmemory -computerName $_ | Select-Object -ExpandProperty Capacity ;
+$build = Get-CimInstance win32_operatingsystem -computerName $_ | Select-Object -ExpandProperty BuildNumber  ;
+$fabricante = Get-WmiObject Win32_BaseBoard -computerName $_ | Select-Object -ExpandProperty Manufacturer ;
+$modelo = Get-WmiObject -Class Win32_ComputerSystem | Select-Object -ExpandProperty Model;
+$numeroserie = Get-WmiObject Win32_BaseBoard -computerName $_ | Select-Object -ExpandProperty SerialNumber ;
+$discototal = Get-WmiObject Win32_LogicalDisk -Filter "DeviceID='C:'" -computerName $_ | Select-Object -ExpandProperty Size;
+$discolibre = Get-WmiObject Win32_LogicalDisk -Filter "DeviceID='C:'" -computerName $_ | Select-Object -ExpandProperty FreeSpace ;
+if ($discototal) {
+$discototal = $discototal/1024/1024/1024;
+$discototal = [math]::Round($discototal,2);
+};
+if ($discolibre) {
+$discolibre = $discolibre/1024/1024/1024;
+$discolibre = [math]::Round($discolibre,2);
+};
+Get-RemoteProgram -computerName $_ -Property Publisher,InstallDate,DisplayVersion,InstallSource,IsMinorUpgrade,ReleaseType,ParentDisplayName,SystemComponent |
+ Where-Object {[string]$_.SystemComponent -ne 1 -and ![string]$_.IsMinorUpgrade -and ![string]$_.ReleaseType -and ![string]$_.ParentDisplayName} |
+ Select-Object ComputerName,
+ProgramName,
+Publisher,
+DisplayVersion,
+@{Name="NOMBRE PC"; Expression={$($nombrepc)}},
+@{Name="FECHA CAPTURA DATOS"; Expression={$($fecha)}},
+@{Name="Ip"; Expression={$($ip)}},
+@{Name="ACTIVO"; Expression={$($activo)}},
+@{Name="MAC"; Expression={$($mac)}},
+@{Name="CPU"; Expression={$($cpu)}},
+@{Name="RAM Veloc."; Expression={$($ramvelocidad)}},
+@{Name="RAM Tipo"; Expression={$($ramtipo)}},
+@{Name="RAM Tam."; Expression={$($ramtamaño)}},
+@{Name="BUILD S.O."; Expression={$($build)}},
+@{Name="FABRICANTE"; Expression={$($fabricante)}},
+@{Name="MODELO"; Expression={$($modelo)}},
+@{Name="NUMERO SERIE"; Expression={$($numeroserie)}},
+@{Name="DISCO TOTAL (GB)"; Expression={$($discototal)}},
+@{Name="DISCO LIBRE (GB)"; Expression={$($discolibre)}} |
+ Write-Output
+} |
+Export-Csv -Path ..\Desktop\LISTADOPRUEBA.CSV -Encoding ascii -NoTypeInformation
